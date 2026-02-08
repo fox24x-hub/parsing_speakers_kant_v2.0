@@ -8,7 +8,6 @@ from aiogram.types import CallbackQuery, Message
 
 
 from config.settings import Settings
-from gpt_client import gpt_search_speakers
 from gpt_client import get_speakers_from_gpt
 from keyboards import topics_keyboard
 from speaker_search import SearchRequestError, parse_find_speakers_args
@@ -67,64 +66,63 @@ async def find_speakers_handler(message: Message, settings: Settings) -> None:
 
     await message.answer("Ищу спикеров, подождите...")
 
+    # season_config.name – это "зима" / "лето"
+    season = season_config.name
+    location_scope = region  # пока 1:1, дальше можно маппить Екб/область/УрФО
+
     try:
-       result = await get_speakers_from_gpt(
-    season=season,
-    location_scope=location_scope,
-    user_query=message.text,
-)
+        result = await get_speakers_from_gpt(
+            season=season,
+            location_scope=location_scope,
+            user_query=message.text,
+        )
     except Exception:
         await message.answer("Ошибка при запросе к GPT. Попробуйте позже.")
         return
 
-    # Красивый вывод
     speakers = result.get("speakers", [])
     if not speakers:
         await message.answer(
-            f"Спикеров для сезона «{result.get('season', season_config.name)}» "
-            f"и региона «{result.get('region', region)}» пока нет в списке."
+            f"Спикеров для сезона «{result.get('season', season)}» "
+            f"и региона «{result.get('location_scope', location_scope)}» пока нет в списке."
         )
-
         await message.answer(
-            "Ответ GPT (для отладки):\n"
-            + json.dumps(result, ensure_ascii=False, indent=2)
+            "Ответ GPT (JSON):\n" + json.dumps(result, ensure_ascii=False, indent=2)
         )
-
         return
 
     lines = [
-        f"🎯 Спикеры для сезона «{result.get('season', season_config.name)}» "
-        f"в регионе «{result.get('region', region)}»:",
+        f"🎯 Спикеры для сезона «{result.get('season', season)}» "
+        f"в регионе «{result.get('location_scope', location_scope)}»:",
         "",
     ]
+
     for idx, sp in enumerate(speakers, start=1):
         name = sp.get("name", "Без имени")
         sport = sp.get("sport", "Спорт не указан")
-        location = sp.get("location", "Локация не указана")
+        city = sp.get("city", "Город не указан")
         expertise = sp.get("expertise", "Описание не указано")
         url = sp.get("url")
 
         line = (
             f"{idx}) {name}\n"
             f"   • Вид спорта: {sport}\n"
-            f"   • Локация: {location}\n"
+            f"   • Город: {city}\n"
             f"   • Тема/экспертиза: {expertise}"
         )
         if url:
             line += f"\n   • Профиль: {url}"
 
         lines.append(line)
-        
         lines.append("")  # пустая строка между спикерами
-
 
     text = "\n".join(lines)
     await message.answer(text)
 
-        text = "\n".join(lines)
-        await message.answer(text)
-        await message.answer(
+    # отладочный JSON (можно потом закомментить)
+    await message.answer(
         "Ответ GPT (JSON):\n" + json.dumps(result, ensure_ascii=False, indent=2)
-        )
+    )
+
 
 
