@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from openai import OpenAI
 from typing import Any
 
 import httpx
+from openai import OpenAI
 
 from config.settings import Settings
 
@@ -76,6 +76,7 @@ SKILL: no-speakers-fallback
   - "location_scope"
   - "speakers" (массив объектов с полями "name", "sport", "expertise", "city", "url").
 """
+
 def _build_chat_url(base_url: str) -> str:
     normalized = base_url.rstrip("/")
     if normalized.endswith("/v1"):
@@ -87,18 +88,13 @@ async def get_speakers_from_gpt(
     season: str,
     location_scope: str,
     user_query: str | None = None,
-) -> dict:
-    """
-    season: "зима" | "лето"
-    region: строка, которую ты затем преобразуешь в location_scope
-    sports: список видов спорта (можешь пока просто прокидывать как контекст)
-    """
-
-    user_payload = {
+) -> dict[str, Any]:
+    user_payload: dict[str, Any] = {
         "season": season,
-        "location_scope": region,   # дальше можешь маппить Екб/область/УрФО
-        "sports": sports,
+        "location_scope": location_scope,
     }
+    if user_query:
+        user_payload["user_query"] = user_query
 
     payload = {
         "model": settings.openai_model,
@@ -121,14 +117,11 @@ async def get_speakers_from_gpt(
     }
     url = _build_chat_url(settings.openai_base_url)
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(url, headers=headers, json=payload)
+    async with httpx.AsyncClient(timeout=30) as http_client:
+        response = await http_client.post(url, headers=headers, json=payload)
         response.raise_for_status()
         data = response.json()
 
     content = data["choices"][0]["message"]["content"]
-
-    # Ожидаем JSON вида:
-    # {"season": "...", "location_scope": "...", "speakers": [ ... ] }
     return json.loads(content)
 
