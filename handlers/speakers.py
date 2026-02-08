@@ -76,4 +76,39 @@ async def find_speakers_handler(message: Message, settings: Settings) -> None:
         await message.answer("Ошибка при запросе к GPT. Попробуйте позже.")
         return
 
-    await message.answer(json.dumps(result, ensure_ascii=False, indent=2))
+    # Красивый вывод
+    speakers = result.get("speakers", [])
+    if not speakers:
+        await message.answer(
+            f"Спикеров для сезона «{result.get('season', season_config.name)}» "
+            f"и региона «{result.get('region', region)}» пока нет в списке."
+        )
+        return
+
+    lines = [
+        f"🎯 Спикеры для сезона «{result.get('season', season_config.name)}» "
+        f"в регионе «{result.get('region', region)}»:",
+        "",
+    ]
+    for idx, sp in enumerate(speakers, start=1):
+        name = sp.get("name", "Без имени")
+        sport = sp.get("sport", "Спорт не указан")
+        location = sp.get("location", "Локация не указана")
+        expertise = sp.get("expertise", "Описание не указано")
+        url = sp.get("url")
+
+        line = (
+            f"{idx}) {name}\n"
+            f"   • Вид спорта: {sport}\n"
+            f"   • Локация: {location}\n"
+            f"   • Тема/экспертиза: {expertise}"
+        )
+        if url:
+            line += f"\n   • Профиль: {url}"
+
+        lines.append(line)
+        lines.append("")  # пустая строка между спикерами
+
+    text = "\n".join(lines)
+    await message.answer(text)
+
