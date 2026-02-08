@@ -6,8 +6,10 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+
 from config.settings import Settings
 from gpt_client import gpt_search_speakers
+from gpt_client import get_speakers_from_gpt
 from keyboards import topics_keyboard
 from speaker_search import SearchRequestError, parse_find_speakers_args
 
