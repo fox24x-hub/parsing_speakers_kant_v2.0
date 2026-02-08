@@ -66,15 +66,16 @@ async def find_speakers_handler(message: Message, settings: Settings) -> None:
 
     await message.answer("Ищу спикеров, подождите...")
 
-    # season_config.name – это "зима" / "лето"
-    season = season_config.name
-    location_scope = region  # пока 1:1, дальше можно маппить Екб/область/УрФО
+    season = season_config.name          # "зима" / "лето"
+    location_scope = region              # пока 1:1
+    sports = ["лыжи", "сноуборд"] if season == "зима" else ["бег", "трейл", "триатлон"]
 
     try:
         result = await get_speakers_from_gpt(
             season=season,
             location_scope=location_scope,
             user_query=message.text,
+            # если захочешь, можно добавить параметр sports в саму функцию
         )
     except Exception:
         await message.answer("Ошибка при запросе к GPT. Попробуйте позже.")
@@ -114,15 +115,11 @@ async def find_speakers_handler(message: Message, settings: Settings) -> None:
             line += f"\n   • Профиль: {url}"
 
         lines.append(line)
-        lines.append("")  # пустая строка между спикерами
+        lines.append("")
 
     text = "\n".join(lines)
     await message.answer(text)
 
-    # отладочный JSON (можно потом закомментить)
     await message.answer(
         "Ответ GPT (JSON):\n" + json.dumps(result, ensure_ascii=False, indent=2)
     )
-
-
-
