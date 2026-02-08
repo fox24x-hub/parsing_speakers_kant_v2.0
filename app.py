@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 
@@ -7,51 +5,57 @@ from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-from config.settings import Settings, get_settings
+from config.settings import get_settings
 from handlers import router
 
+
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def build_dispatcher(settings: Settings) -> Dispatcher:
-    dispatcher = Dispatcher()
-    dispatcher.include_router(router)
-    dispatcher.workflow_data["settings"] = settings
-    return dispatcher
+def build_dispatcher(settings):
+    dp = Dispatcher()
+    dp.include_router(router)
+    dp.workflow_data["settings"] = settings
+    return dp
 
 
-async def on_startup(bot: Bot, settings: Settings) -> None:
-    if settings.webhook_url:
-        await bot.set_webhook(settings.webhook_url)
+async def on_startup(bot: Bot, dp: Dispatcher, webhook_url: str):
+    await bot.set_webhook(webhook_url)
+    logger.info("Webhook set to %s", webhook_url)
 
 
-async def on_shutdown(bot: Bot) -> None:
+async def on_shutdown(bot: Bot):
     await bot.delete_webhook()
+    await bot.session.close()
+    logger.info("Webhook deleted")
 
 
-async def run_webhook() -> None:
+async def main():
     settings = get_settings()
-    bot = Bot(settings.bot_token)
-    dispatcher = build_dispatcher(settings)
 
-    dispatcher.startup.register(lambda _: on_startup(bot, settings))
-    dispatcher.shutdown.register(lambda _: on_shutdown(bot))
+    bot = Bot(token=settings.bot_token)
+    dp = build_dispatcher(settings)
 
     app = web.Application()
-    SimpleRequestHandler(dispatcher=dispatcher, bot=bot).register(app, path="/webhook")
-    setup_application(app, dispatcher, bot=bot)
-    web.run_app(app, host="0.0.0.0", port=settings.port)
 
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
+    setup_application(app, dp, bot=bot)
 
-async def run_polling() -> None:
-    settings = get_settings()
-    bot = Bot(settings.bot_token)
-    dispatcher = build_dispatcher(settings)
-    await dispatcher.start_polling(bot)
+    dp.startup.register(lambda: on_startup(bot, dp, settings.webhook_url))
+    dp.shutdown.register(lambda: on_shutdown(bot))
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="0.0.0.0", port=settings.port)
+    await site.start()
+
+    logger.info("Bot started on port %s", settings.port)
+
+    # держим процесс живым
+    while True:
+        await asyncio.sleep(3600)
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(run_webhook())
-    except RuntimeError:
-        asyncio.run(run_polling())
+    asyncio.run(main())
