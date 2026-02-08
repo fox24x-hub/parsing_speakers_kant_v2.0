@@ -4,13 +4,8 @@ import json
 from typing import Any
 
 import httpx
-from openai import OpenAI
 
 from config.settings import Settings
-
-settings = Settings()
-client = OpenAI(api_key=settings.openai_api_key)
-
 
 SYSTEM_PROMPT = """
 Ты — AI‑ассистент внутри Telegram‑бота parsing_speakers_kant_v2.
@@ -112,7 +107,6 @@ SKILL: no-speakers-fallback
 
 
 """
-
 def _build_chat_url(base_url: str) -> str:
     normalized = base_url.rstrip("/")
     if normalized.endswith("/v1"):
@@ -121,9 +115,11 @@ def _build_chat_url(base_url: str) -> str:
 
 
 async def get_speakers_from_gpt(
+    *,
     season: str,
     location_scope: str,
     user_query: str | None = None,
+    settings: Settings,
 ) -> dict[str, Any]:
     user_payload: dict[str, Any] = {
         "season": season,
